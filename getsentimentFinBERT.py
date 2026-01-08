@@ -19,4 +19,4 @@ def get_finbert_score(text:str) -> float:
 
     # Score: +1 * positive + (-1) * negative + 0 * neutral
     score = probs[label2id["positive"]] * 1 + probs[label2id["negative"]] * -1
-    return round(score, 4)  # z.B. 0.75 = eher positiv, -0.8 = klar negativ, ~0 = neutral
+    return round(score, 4)  

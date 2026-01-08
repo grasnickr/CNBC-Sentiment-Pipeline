@@ -3,14 +3,14 @@ import pandas as pd
 from datetime import datetime
 import json
 import sys
-# Falls das Modul lokal liegt, stelle sicher, dass der Pfad stimmt
 from getsentimentFinBERT import get_finbert_score
 
 BASE_URL = "https://api.queryly.com/cnbc/json.aspx?queryly_key=31a35d40a9a64ab3&query={ticker}&endindex={endindex}&batchsize=100&callback=&showfaceted=false&timezoneoffset=-120&facetedfields=formats&facetedkey=formats|&facetedvalue=!Press%20Release|&sort=date&additionalindexes=4cd6f71fbf22424d,937d600b0d0d4e23,3bfbe40caee7443e,626fdfcd96444f28"
 
 UNIQUE_FIELD_JSON = 'url' 
 
-ticker = "Micron"
+def get_news_sentiment(maxpages:int, ticker: str) -> pd.DataFrame:
+    return get_news_dataframe(maxpages, ticker)
 
 def parse_date(date_str):
     if not date_str:
@@ -20,7 +20,7 @@ def parse_date(date_str):
     except (ValueError, TypeError):
         return None
 
-def fetch_articles(endindex):
+def fetch_articles(endindex, ticker):
     url = BASE_URL.format(ticker = ticker, endindex=endindex)
     try:
         response = requests.get(url, timeout=20)
@@ -54,7 +54,6 @@ def process_batch(data, existing_urls):
             pub_date = parse_date(raw_date)
             input_text = f"{title}: {description}"
             
-            # Sentiment analysis (FinBERT)
             sentiment_score = get_finbert_score(input_text)
             
             batch_data.append({
@@ -71,7 +70,7 @@ def process_batch(data, existing_urls):
 
     return batch_data, found_duplicate
 
-def get_news_dataframe(max_pages=5):
+def get_news_dataframe(max_pages, ticker):
     all_articles_list = []
     seen_urls = set()
     endindex = 0
@@ -83,7 +82,7 @@ def get_news_dataframe(max_pages=5):
         batch_counter += 1
         print(f"Load batch {batch_counter} (Index: {endindex})...")
 
-        data = fetch_articles(endindex)
+        data = fetch_articles(endindex, ticker)
         if not data or 'results' not in data:
             break
 
@@ -116,19 +115,3 @@ def get_news_dataframe(max_pages=5):
     print(f"Finished! {len(df)} articles processed")
     return df
 
-if __name__ == "__main__":
-
-    news_df = get_news_dataframe()
-    path = "sentiment" + ticker + ".csv"
-    news_df.to_csv(path, index="published_date")
-    
-
-    if not news_df.empty:
-        print("\n--- Data preview ---")
-        print(news_df[['published_date', 'title', 'sentiment_score']].head(10))
-
-
-        
-
-    else:
-        print("Keine Daten gefunden.")
