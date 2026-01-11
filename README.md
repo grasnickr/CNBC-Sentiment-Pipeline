@@ -1,51 +1,141 @@
-# CNBC Sentiment  Pipeline
+# CNBC Sentiment Pipeline
 
-An automated pipeline designed to extract and analyze financial news sentiment. This project combines **reverse-engineered API access** with state-of-the-art **Natural Language Processing (NLP)** to quantify market sentiment for specific stock tickers.
+An automated pipeline designed to extract and analyze financial news sentiment from CNBC. This project combines **reverse-engineered API access** with state-of-the-art **Natural Language Processing (NLP)** to quantify market sentiment for specific stock tickers.
 
-
----
-
-## 🚀 Features
-
-* **Undocumented API Integration**: Efficiently fetches news data directly via CNBC’s internal search infrastructure.
-* **Financial Sentiment Analysis**: Utilizes the **ProsusAI/FinBERT** model, specifically fine-tuned for financial texts.
-* **Pandas Workflow**: Automatically generates cleaned DataFrames ready for downstream analysis or machine learning models like LSTMs.
-* **Hardware Optimized**: Supports CUDA acceleration for fast inference on NVIDIA GPUs.
 
 ---
 
-## 🛠 Installation
+## Features
 
-1.  **Clone the Repository**:
-    ```bash
-    git clone [https://github.com/your-username/CNBC-Sentiment-Pipeline.git](https://github.com/your-username/CNBC-Sentiment-Pipeline.git)
-    cd CNBC-Sentiment-Pipeline
-    ```
-
-2.  **Create a Virtual Environment**:
-    ```bash
-    python -m venv venv
-    .\venv\Scripts\activate
-    ```
-
-3.  **Install Dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
+* **Undocumented API Integration**: Efficiently fetches news data directly via CNBC's internal search infrastructure through reverse-engineered endpoints
+* **Financial Sentiment Analysis**: Utilizes the **ProsusAI/FinBERT** model, specifically fine-tuned for financial texts, achieving state-of-the-art accuracy on financial sentiment tasks
+* **Automated Data Pipeline**: Generates cleaned Pandas DataFrames ready for downstream analysis, visualization, or integration with machine learning models
+* **Hardware Optimized**: Supports CUDA acceleration for fast inference on NVIDIA GPUs (up to 10x faster than CPU)
+* **Deduplication & Error Handling**: Robust duplicate detection and comprehensive error handling for reliable long-running operations
 
 ---
 
-## 📈 Usage (Library Import)
+## Example Output
 
-The logic is modular and can be imported into research scripts or automated trading strategies.
+After fetching 500 articles for Micron (MU), the pipeline generates a DataFrame like this:
+
+
+| Title | Published Date | Sentiment Score | URL |
+| :--- | :--- | :--- | :--- |
+| Micron gets an upgrade from Bank of America after blowout quarter | 2025-12-18 | 0.9340 | [View Article](https://www.cnbc.com/2025/12/18/micron-gets-an-upgrade-from-bank-of-america-after-blowout-quarter-and-guidance.html) |
+| Micron stock pops 10% as AI memory demand soars | 2025-12-18 | 0.8519 | [View Article](https://www.cnbc.com/2025/12/18/micron-mu-stock-earnings-ai-memory-demand.html) |
+| U.S. finalizes more than $6.1 billion chips subsidy for Micron | 2024-12-10 | 0.8578 | [View Article](https://www.cnbc.com/2024/12/10/us-finalizes-more-than-6point1-billion-chips-subsidy-for-micron-technology.html) |
+| Micron to exit server chips business in China after ban | 2025-10-17 | -0.9224 | [View Article](https://www.cnbc.com/2025/10/17/micron-to-exit-server-chips-business-in-china-after-ban-report.html) |
+| Micron shares suffer steepest drop since 2020 on weak guidance | 2024-12-19 | -0.9655 | [View Article](https://www.cnbc.com/2024/12/19/micron-headed-for-worst-day-since-2020-after-disappointing-guidance.html) |
+
+**Sentiment Score Range**: -1.0 (very negative) to +1.0 (very positive)
+
+---
+
+## Quick Start
+
+### Installation
+
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/grasnickr/CNBC-Sentiment-Pipeline
+   cd CNBC-Sentiment-Pipeline
+   ```
+
+2. **Create Virtual Environment**:
+   ```bash
+   python -m venv venv
+   
+   # Windows
+   .\venv\Scripts\activate
+   
+   # Linux/Mac
+   source venv/bin/activate
+   ```
+
+3. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### Basic Usage
 
 ```python
 from StockSentiment import get_news_sentiment
 
-# Parameters: maxpages (100 articles per page), ticker symbol
+# Fetch and analyze news for a specific ticker
 ticker = "AAPL"
-df = get_news_sentiment(maxpages=5, ticker=ticker)
+df = get_news_sentiment(maxpages=5, ticker=ticker)  # 5 pages = ~00 articles
 
-# Preview analyzed data
+# Display results
 if not df.empty:
-    print(df[['published_date', 'title', 'sentiment_score']].head())
+    print(f"\n Analyzed {len(df)} articles for {ticker}")
+    print(f"Average Sentiment: {df['sentiment_score'].mean():.4f}")
+    print("\nMost Recent Articles:")
+    print(df[['published_date', 'title', 'sentiment_score']].head(10))
+```
+
+### Advanced Example: Time Series Analysis
+
+```python
+import matplotlib.pyplot as plt
+
+# Fetch data
+df = get_news_sentiment(maxpages=10, ticker="TSLA")
+
+# Aggregate daily sentiment
+daily_sentiment = df.groupby(df['published_date'].dt.date)['sentiment_score'].mean()
+
+# Plot sentiment over time
+plt.figure(figsize=(12, 6))
+plt.plot(daily_sentiment.index, daily_sentiment.values, marker='o')
+plt.title('TSLA News Sentiment Over Time')
+plt.xlabel('Date')
+plt.ylabel('Average Sentiment Score')
+plt.axhline(y=0, color='r', linestyle='--', alpha=0.3)
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
+```
+
+---
+
+## Technical Details
+
+### API Parameters
+- **Base URL**: CNBC's Queryly search endpoint
+- **Batch Size**: 100 articles per request
+- **Pagination**: Automatic handling via `endindex` parameter
+- **Rate Limiting**: Built-in request timeouts (20s) and error handling
+
+### Sentiment Model
+- **Model**: [ProsusAI/FinBERT](https://huggingface.co/ProsusAI/finbert)
+- **Architecture**: BERT-based transformer, fine-tuned on financial texts
+- **Input**: Concatenated title + description (max 512 tokens)
+- **Output**: Composite score from positive/negative probabilities
+  - Formula: `score = P(positive) - P(negative)`
+  - Range: [-1.0, 1.0]
+
+
+---
+
+
+## Use Cases
+
+- **Quantitative Trading**: Incorporate sentiment signals into trading algorithms
+- **Market Research**: Analyze media coverage trends for specific stocks or sectors
+- **Academic Research**: Study correlation between news sentiment and stock price movements
+- **Data Science Projects**: Use as a data source for ML models (e.g., LSTM price prediction)
+- **Portfolio Analysis**: Monitor sentiment for entire portfolios
+
+---
+
+## Limitations & Considerations
+
+- **API Stability**: Uses reverse-engineered endpoints that may change without notice
+- **Rate Limiting**: No official rate limits known, but implement delays for large-scale scraping
+- **Legal**: Ensure compliance with CNBC's Terms of Service for your use case
+- **Sentiment Accuracy**: FinBERT is trained on financial texts but not perfect - always validate results
+- **Historical Data**: API provides recent news; older articles may have limited availability
+
+---
